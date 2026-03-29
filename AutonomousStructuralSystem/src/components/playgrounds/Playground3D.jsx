@@ -14,6 +14,8 @@ export default function Playground3D({ setGeneratedModels }) {
   const [buildMode, setBuildMode] = useState('SELECT'); // 'SELECT', 'WALL', 'DOOR', 'WINDOW'
   const [startPoint, setStartPoint] = useState(null);
   const [previewEnd, setPreviewEnd] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [analysis, setAnalysis] = useState(null);
 
   const handleCreateNew = () => {
     setElements([]);
@@ -29,6 +31,55 @@ export default function Playground3D({ setGeneratedModels }) {
     ]);
     setProjectLoaded(true);
   };
+
+  const handleUpload = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      setLoading(true);
+      const formData = new FormData();
+      formData.append('file', file);
+      try {
+          const res = await axios.post('http://localhost:8000/api/parse-floorplan', formData);
+          if (res.data.walls && res.data.walls.length > 0) {
+              const mappedElements = res.data.walls.map(w => ({
+                  id: generateId(),
+                  type: 'wall',
+                  start: [w.startX, 0, w.startY],
+                  end: [w.endX, 0, w.endY],
+                  thickness: w.thickness,
+                  isLoadBearing: w.isLoadBearing,
+                  hasWindow: w.hasWindow,
+                  hasDoor: w.hasDoor
+              }));
+              setElements(mappedElements);
+              setProjectLoaded(true);
+              
+              setAnalysis(null);
+              try {
+                  const aiRes = await axios.post('http://localhost:8000/api/analyze-materials', {
+                      walls: res.data.walls
+                  });
+                  setAnalysis(aiRes.data);
+              } catch(aiErr) {
+                  console.error('LLM Failure:', aiErr);
+              }
+              
+              try {
+                  const modelsRes = await axios.get('http://localhost:8000/api/models');
+                  if (setGeneratedModels) setGeneratedModels(modelsRes.data);
+              } catch (refreshErr) {
+                  console.error("Failed to refresh global state:", refreshErr);
+              }
+          } else {
+              alert("No structural geometry found. Please ensure the blueprint has clear, distinct walls.");
+          }
+      } catch(err) {
+          console.error('CV Backend Failed:', err);
+          alert("CV Backend Failed");
+      }
+      setLoading(false);
+  };
+
 
   const handleSave = async () => {
     if (elements.length === 0) return;
@@ -111,6 +162,10 @@ export default function Playground3D({ setGeneratedModels }) {
           >
             LOAD RECENT MODEL
           </button>
+          <label className="border border-black bg-black px-6 py-3 text-sm text-white transition-colors hover:bg-gray-800 text-center cursor-pointer">
+            {loading ? '[ PARSING BLUEPRINT... ]' : '[ UPLOAD FLOOR PLAN ]'}
+            <input type="file" className="hidden" accept="image/*" onChange={handleUpload} />
+          </label>
         </div>
       </div>
     );
@@ -142,7 +197,51 @@ export default function Playground3D({ setGeneratedModels }) {
         >
           {isSaving ? '[ PERSISTING... ]' : '[ PERSIST MODEL ]'}
         </button>
+
+        <label className="mt-2 border border-black bg-black px-4 py-2 text-sm text-white transition-colors hover:bg-gray-800 text-center cursor-pointer">
+          {loading ? '[ PARSING... ]' : '[ AUTOPARSE PLAN ]'}
+          <input type="file" className="hidden" accept="image/*" onChange={handleUpload} />
+        </label>
       </div>
+
+      {analysis && (
+        <div className="absolute right-4 top-4 z-20 w-80 flex flex-col gap-4 pointer-events-none">
+          <div className="bg-white/90 backdrop-blur border border-black p-5 shadow-[4px_4px_0_0_rgba(0,0,0,1)] pointer-events-auto">
+              <h4 className="font-headline font-bold text-xs uppercase mb-3 border-b border-black pb-1 flex justify-between items-center">
+                  <span>Material Analysis</span>
+                  <span className="font-label text-[8px] bg-black text-white px-1 py-0.5">STAGE 04</span>
+              </h4>
+              <div className="flex flex-col gap-2 max-h-48 overflow-y-auto pr-1">
+                  {analysis.materialsTradeoff && analysis.materialsTradeoff.map((tradeoff, idx) => (
+                      <div key={idx} className="border border-gray-200 p-2 text-[10px] font-label">
+                         <div className="flex justify-between text-gray-800 font-bold mb-1 uppercase text-[9px] border-b border-black pb-1">
+                            <span>{tradeoff.elementId}</span>
+                            <span className="bg-gray-100 px-1">{tradeoff.category}</span>
+                         </div>
+                         {tradeoff.rankedOptions.map((opt, i) => (
+                             <div key={i} className="mt-1 flex flex-col border-t border-gray-100 pt-1">
+                                <div className="flex justify-between items-center mb-1">
+                                    <span className="text-black font-bold bg-black text-white px-1 mr-2 tracking-widest leading-none py-0.5">{opt.name}</span>
+                                    <span className="text-gray-900 font-mono text-[8px] bg-gray-200 px-1 py-0.5 leading-none shadow-[1px_1px_0_0_rgba(0,0,0,0.2)]">RATIO: {opt.costStrengthRatio}</span>
+                                </div>
+                                <div className="text-gray-500 text-[8px] leading-[1.2rem] mt-0.5">JUSTIFICATION: {opt.justification}</div>
+                             </div>
+                         ))}
+                      </div>
+                  ))}
+              </div>
+          </div>
+          <div className="bg-white/90 backdrop-blur border border-black p-5 shadow-[4px_4px_0_0_rgba(0,0,0,1)] pointer-events-auto">
+              <h4 className="font-headline font-bold text-xs uppercase mb-3 border-b border-black pb-1 flex justify-between items-center">
+                  <span>Explainability</span>
+                  <span className="font-label text-[8px] bg-black text-white px-1 py-0.5">STAGE 05</span>
+              </h4>
+              <p className="font-mono text-[9px] text-gray-700 leading-relaxed uppercase">
+                  {analysis.llmExplanation}
+              </p>
+          </div>
+        </div>
+      )}
 
       {/* 3D Canvas */}
       <Canvas onPointerMove={startPoint ? handlePointerMove : undefined}>
@@ -200,7 +299,7 @@ function Wall({ wall, buildMode, elements, setElements, isPreview }) {
 
   const length = start.distanceTo(end);
   const height = 3.0;
-  const thickness = 0.2;
+  const thickness = wall.thickness || 0.2;
 
   const position = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
   position.y = height / 2;
