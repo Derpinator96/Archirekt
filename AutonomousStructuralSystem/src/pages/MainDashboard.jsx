@@ -1,5 +1,5 @@
 import React from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from '../components/layout/Sidebar';
 import Topbar from '../components/layout/Topbar';
 import ModelGallery from '../components/dashboard/ModelGallery';
@@ -34,7 +34,7 @@ const galleryVariants = {
   }
 };
 
-const NavigationCard = ({ icon, title, subtitle, status, isGuest, translateClasses }) => (
+const NavigationCard = ({ icon, title, subtitle, status, isGuest, translateClasses, onClick }) => (
   <div 
     className={`absolute top-1/2 left-1/2 ${translateClasses} z-20 pointer-events-none`}
     style={{ marginTop: '-50px', marginLeft: '-128px' }}
@@ -42,7 +42,8 @@ const NavigationCard = ({ icon, title, subtitle, status, isGuest, translateClass
     <motion.div 
       variants={itemVariants}
       whileHover={isGuest ? {} : { scale: 1.02 }}
-      className={`w-64 border border-black bg-white p-5 shadow-[0_1px_0_0_rgba(0,0,0,1)] pointer-events-auto ${isGuest ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+      onClick={isGuest ? undefined : onClick}
+      className={`w-64 border border-black bg-white p-5 shadow-[0_1px_0_0_rgba(0,0,0,1)] pointer-events-auto ${isGuest ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} transition-colors hover:bg-gray-50`}
     >
       <div className={`flex items-center gap-3 mb-3 ${isGuest ? '' : 'group-hover:text-gray-700'}`}>
         <span className="material-symbols-outlined text-lg">{icon}</span>
@@ -59,15 +60,16 @@ const NavigationCard = ({ icon, title, subtitle, status, isGuest, translateClass
 
 const MainDashboard = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const isGuest = location.state?.guest;
 
   return (
-    <div className="bg-white text-black h-screen w-screen fixed inset-0 font-body overflow-hidden architectural-grid z-0">
+    <div className="bg-white text-black w-screen min-h-screen relative font-body overflow-x-hidden z-0">
       <Topbar />
       <Sidebar />
 
-      {/* Main Canvas Context */}
-      <main className="absolute inset-0 z-10 w-full h-full pointer-events-none">
+      {/* Main Canvas Context - First 100vh Screen */}
+      <main className="relative z-10 w-full h-[100vh] pointer-events-none architectural-grid">
         
         {/* Absolute Top Right System Status (Swiss Minimal) */}
         <motion.div 
@@ -159,24 +161,17 @@ const MainDashboard = () => {
                 status="MOD: INPUT_NODE" 
                 isGuest={isGuest} 
                 translateClasses="translate-x-[20rem] translate-y-[12rem] xl:translate-x-[24rem]" 
+                onClick={() => navigate('/playground')}
             />
         </motion.div>
-        
-        {/* Floating Bottom Gallery row - wraps horizontally to bounds */}
-        <motion.div 
-            variants={galleryVariants}
-            initial="hidden"
-            animate="visible"
-            className="absolute bottom-0 left-20 right-0 px-12 pointer-events-auto z-30"
-        >
-            <div className="w-full flex justify-center">
-                <div className="max-w-6xl w-full border border-black border-b-0 bg-white/95 backdrop-blur max-h-[260px] overflow-y-auto">
-                    <ModelGallery locked={isGuest} />
-                </div>
-            </div>
-        </motion.div>
-
       </main>
+
+      {/* Model Gallery Below Fold */}
+      <section className="relative w-full z-20 bg-white border-t border-black pointer-events-auto">
+          <div className="max-w-7xl mx-auto">
+              <ModelGallery locked={isGuest} />
+          </div>
+      </section>
     </div>
   );
 };
