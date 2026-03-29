@@ -9,8 +9,17 @@ from datetime import datetime
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from shapely.geometry import LineString, Point
+import os
+import math
+from dotenv import load_dotenv
+from openai import AsyncOpenAI
+
+load_dotenv()
+
+SNAPPING_TOLERANCE_PX = 15
+OPENAI_CLIENT = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 app = FastAPI(title="A.S.I.S. Floor Parser")
 
@@ -46,6 +55,23 @@ class Wall(BaseModel):
 class ParseResponse(BaseModel):
     id: str
     walls: List[Wall]
+
+class TradeoffOption(BaseModel):
+    name: str
+    costStrengthRatio: str
+    justification: str
+
+class MaterialTradeoff(BaseModel):
+    elementId: str
+    category: str
+    rankedOptions: List[TradeoffOption]
+
+class AnalyzeMaterialsRequest(BaseModel):
+    walls: List[Wall]
+
+class AnalyzeMaterialsResponse(BaseModel):
+    materialsTradeoff: List[MaterialTradeoff]
+    llmExplanation: str
 
 class ModelRecord(BaseModel):
     id: str
@@ -128,21 +154,87 @@ async def parse_floorplan(file: UploadFile = File(...)):
             line_geom = LineString([(mapped_x1, mapped_y1), (mapped_x2, mapped_y2)])
             if line_geom.length < 0.5:
                 continue
-                
             processed_lines.append(line_geom)
             
-        # Simplistic line merging heuristic: Skip lines that are almost identical
-        filtered_lines = []
-        for l in processed_lines:
-            # Check if l is too close to any line in filtered_lines
-            is_dup = False
-            for fl in filtered_lines:
-                # if distance between them is tiny, and they are parallel, it's a duplicate edge
-                if l.distance(fl) < 0.5 and abs(l.length - fl.length) < 2.0:
-                    is_dup = True
+        # 1. COLLINEAR MERGING & 2. CORNER SNAPPING
+        snapping_dist = SNAPPING_TOLERANCE_PX * scale_x
+        
+        def merge_lines(lines_to_merge):
+            merged = []
+            for l in lines_to_merge:
+                is_merged = False
+                for i, ml in enumerate(merged):
+                    # If lines are very close and parallel (similar slope via buffering)
+                    if l.distance(ml) < snapping_dist * 0.5:
+                        # Angle check
+                        dx1, dy1 = l.coords[1][0] - l.coords[0][0], l.coords[1][1] - l.coords[0][1]
+                        dx2, dy2 = ml.coords[1][0] - ml.coords[0][0], ml.coords[1][1] - ml.coords[0][1]
+                        a1, a2 = math.atan2(dy1, dx1), math.atan2(dy2, dx2)
+                        
+                        # Normalize angles to [0, pi) for parallel check
+                        a1 = a1 % math.pi
+                        a2 = a2 % math.pi
+                        if abs(a1 - a2) < 0.2 or abs(a1 - a2) > (math.pi - 0.2):
+                            # Collinear and close: merge by grabbing outermost points
+                            pts = list(l.coords) + list(ml.coords)
+                            # Find two points that maximize distance
+                            max_d = 0
+                            best_pair = (pts[0], pts[1])
+                            for p1 in pts:
+                                for p2 in pts:
+                                    d = math.hypot(p1[0]-p2[0], p1[1]-p2[1])
+                                    if d > max_d:
+                                        max_d = d
+                                        best_pair = (p1, p2)
+                            
+                            merged[i] = LineString([best_pair[0], best_pair[1]])
+                            is_merged = True
+                            break
+                if not is_merged:
+                    merged.append(l)
+            return merged
+
+        # Execute Collinear Merge
+        merged_lines = merge_lines(processed_lines)
+        
+        # Execute Corner Snapping
+        endpoints = []
+        for ml in merged_lines:
+            endpoints.extend(list(ml.coords))
+            
+        # Group close endpoints into clusters
+        clusters = []
+        for ep in endpoints:
+            found_cluster = False
+            for cluster in clusters:
+                if math.hypot(ep[0]-cluster[0][0], ep[1]-cluster[0][1]) < snapping_dist:
+                    cluster.append(ep)
+                    found_cluster = True
                     break
-            if not is_dup:
-                filtered_lines.append(l)
+            if not found_cluster:
+                clusters.append([ep])
+                
+        # Calculate centroids of clusters
+        snapped_nodes = {}
+        for cluster in clusters:
+            cx = sum(p[0] for p in cluster) / len(cluster)
+            cy = sum(p[1] for p in cluster) / len(cluster)
+            for p in cluster:
+                snapped_nodes[p] = (cx, cy)
+                
+        # Remap lines to snapped endpoints
+        filtered_lines = []
+        for ml in merged_lines:
+            p1, p2 = ml.coords[0], ml.coords[1]
+            new_p1 = snapped_nodes.get(p1, p1)
+            new_p2 = snapped_nodes.get(p2, p2)
+            dist = math.hypot(new_p1[0]-new_p2[0], new_p1[1]-new_p2[1])
+            if dist > 0.1:
+                filtered_lines.append(LineString([new_p1, new_p2]))
+                
+        # Sort by length and cap to top 150 to prevent frontend WebGL Context Lost
+        filtered_lines.sort(key=lambda x: x.length, reverse=True)
+        filtered_lines = filtered_lines[:150]
 
         for l in filtered_lines:
             coords = list(l.coords)
@@ -190,6 +282,73 @@ async def parse_floorplan(file: UploadFile = File(...)):
 
     return ParseResponse(id=model_id, walls=walls)
 
+@app.post("/api/analyze-materials", response_model=AnalyzeMaterialsResponse)
+async def analyze_materials(req: AnalyzeMaterialsRequest):
+    materials_db = []
+    try:
+        with open("services/materials.json", "r") as f:
+            materials_db = json.load(f)
+    except Exception as e:
+        print("Materials JSON missing", e)
+    
+    # Analyze geometry
+    load_bearing = [w for w in req.walls if w.isLoadBearing]
+    spans = [math.hypot(w.endX - w.startX, w.endY - w.startY) for w in load_bearing]
+    max_span = max(spans) if spans else 0
+    total_walls = len(req.walls)
+    
+    prompt = f"""
+You are a Senior Structural Engineer. Analyze this geometry data for an architectural layout:
+- Total Walls: {total_walls}
+- Load Bearing Walls: {len(load_bearing)}
+- Max Structural Span: {max_span:.2f} meters
+
+Here is the officially approved materials database:
+{json.dumps(materials_db, indent=2)}
+
+OUTPUT REQUIREMENT:
+You MUST output ONLY valid JSON matching this exact structure:
+{{
+  "materialsTradeoff": [
+    {{
+      "elementId": "Load Bearing Walls",
+      "category": "Structural",
+      "rankedOptions": [
+        {{ "name": "Material from DB", "costStrengthRatio": "High/Low", "justification": "Why?" }}
+      ]
+    }}
+  ],
+  "llmExplanation": "A plain language summary of your analysis based on spans and physics."
+}}
+Do NOT output any markdown formatting, just the raw JSON string. Do NOT invent new materials.
+"""
+
+    if not OPENAI_CLIENT.api_key:
+        return AnalyzeMaterialsResponse(
+            materialsTradeoff=[],
+            llmExplanation="OPENAI API KEY MISSING. Analysis disabled."
+        )
+
+    try:
+        response = await OPENAI_CLIENT.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2
+        )
+        content = response.choices[0].message.content.strip()
+        if content.startswith("```json"):
+            content = content[7:-3].strip()
+            
+        data = json.loads(content)
+        return AnalyzeMaterialsResponse(**data)
+    except Exception as e:
+        print(f"OpenAI LLM Failure: {e}")
+        return AnalyzeMaterialsResponse(
+            materialsTradeoff=[],
+            llmExplanation=f"LLM Error: Failed to generate tradeoffs."
+        )
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("floor_parser:app", host="0.0.0.0", port=8000, reload=True)
+

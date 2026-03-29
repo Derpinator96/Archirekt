@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrthographicCamera, OrbitControls, Edges } from '@react-three/drei';
 import * as THREE from 'three';
+import axios from 'axios';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 
-export default function Playground3D() {
+export default function Playground3D({ setGeneratedModels }) {
   const [projectLoaded, setProjectLoaded] = useState(false);
   const [elements, setElements] = useState([]);
+  const [isSaving, setIsSaving] = useState(false);
   
   const [buildMode, setBuildMode] = useState('SELECT'); // 'SELECT', 'WALL', 'DOOR', 'WINDOW'
   const [startPoint, setStartPoint] = useState(null);
@@ -26,6 +28,31 @@ export default function Playground3D() {
       { id: '4', type: 'wall', start: [-5, 0, 5], end: [-5, 0, -5] }
     ]);
     setProjectLoaded(true);
+  };
+
+  const handleSave = async () => {
+    if (elements.length === 0) return;
+    setIsSaving(true);
+    try {
+      const modelData = {
+        name: `Design_${new Date().toISOString().slice(0,10)}_${generateId()}`,
+        elements: elements,
+        timestamp: new Date().toISOString()
+      };
+      
+      // Mocking a backend save
+      const res = await axios.post('http://localhost:8000/api/models', modelData);
+      if (res.data) {
+        setGeneratedModels(prev => [...prev, res.data]);
+        alert("ARCHITECTURAL STATE PERSISTED TO SYSTEM");
+      }
+    } catch (err) {
+      console.error("Save failed:", err);
+      // Fallback for UI if backend is not up
+      setGeneratedModels(prev => [...prev, { id: generateId(), ...modelData }]);
+      alert("LOCAL PERSISTENCE ACTIVE (REMOTE OFFLINE)");
+    }
+    setIsSaving(false);
   };
 
   const handlePointerDown = (e) => {
@@ -104,6 +131,13 @@ export default function Playground3D() {
             {mode === 'SELECT' ? '[ CURSOR ]' : `[ + ${mode} ]`}
           </button>
         ))}
+        <button
+          onClick={handleSave}
+          disabled={isSaving}
+          className="mt-4 border border-black bg-black px-4 py-2 text-sm text-white transition-colors hover:bg-white hover:text-black disabled:opacity-50"
+        >
+          {isSaving ? '[ PERSISTING... ]' : '[ PERSIST MODEL ]'}
+        </button>
       </div>
 
       {/* 3D Canvas */}

@@ -58,10 +58,10 @@ const NavigationCard = ({ icon, title, subtitle, status, isGuest, translateClass
   </div>
 );
 
-const MainDashboard = () => {
+const MainDashboard = ({ models = [] }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const isGuest = location.state?.guest;
+  const isGuest = false; // Overriding from state to disable guest locking
 
   return (
     <div className="bg-white text-black w-screen min-h-screen relative font-body overflow-x-hidden z-0">
@@ -150,8 +150,9 @@ const MainDashboard = () => {
                 title="Analyze Game" 
                 subtitle="High-fidelity 3D Render" 
                 status="MOD: RENDER" 
-                isGuest={isGuest} 
+                isGuest={false} 
                 translateClasses="translate-x-[20rem] -translate-y-[12rem] xl:translate-x-[24rem]" 
+                onClick={() => navigate('/dashboard/game-select')}
             />
 
             {/* Bottom Right */}
@@ -170,7 +171,7 @@ const MainDashboard = () => {
       {/* Model Gallery Below Fold */}
       <section className="relative w-full z-20 bg-white border-t border-black pointer-events-auto">
           <div className="max-w-7xl mx-auto">
-              <ModelGallery locked={isGuest} />
+              <ModelGallery models={models} />
           </div>
       </section>
     </div>

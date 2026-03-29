@@ -149,7 +149,7 @@ const FloorPlanModels = ({ walls }) => {
     );
 }
 
-const Playground3D = ({ locked }) => {
+const Upload = ({ locked }) => {
   const initialWalls = [
       { startX: -5, startY: -5, endX: 5, endY: -5, thickness: 0.4, isLoadBearing: true, hasWindow: true, hasDoor: false },
       { startX: 5, startY: -5, endX: 5, endY: 5, thickness: 0.4, isLoadBearing: true, hasWindow: true, hasDoor: false },
@@ -245,4 +245,4 @@ const Playground3D = ({ locked }) => {
   );
 };
 
-export default Playground3D;
+export default Upload;
