@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-white text-black overflow-x-hidden;
+    font-family: 'Inter', sans-serif;
+    background-image: 
+        linear-gradient(to right, #eeeeee 1px, transparent 1px),
+        linear-gradient(to bottom, #eeeeee 1px, transparent 1px);
+    background-size: 40px 40px;
+    margin: 0;
+    padding: 0;
+  }
+}
+
+.label-font {
+  font-family: 'Space Grotesk', monospace;
+}
+
+.crosshair {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+}
+.crosshair::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 0;
+  width: 9px;
+  height: 1px;
+  background-color: #cccccc;
+}
+.crosshair::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 4px;
+  width: 1px;
+  height: 9px;
+  background-color: #cccccc;
+}
+
+.instant-invert:hover {
+  background-color: #000 !important;
+  color: #fff !important;
+}
+.instant-invert:hover * {
+  color: #fff !important;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}

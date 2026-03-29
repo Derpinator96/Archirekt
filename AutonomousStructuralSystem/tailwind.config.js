@@ -1,0 +1,73 @@
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: [
+    './index.html',
+    './src/**/*.{js,ts,jsx,tsx}',
+  ],
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        "outline": "#7e7576",
+        "on-primary": "#ffffff",
+        "on-surface-variant": "#4c4546",
+        "background": "#ffffff",
+        "tertiary-fixed-dim": "#c6c6c6",
+        "on-tertiary-fixed-variant": "#474747",
+        "on-tertiary": "#ffffff",
+        "primary": "#000000",
+        "inverse-on-surface": "#f1f0f0",
+        "surface-variant": "#e3e2e2",
+        "on-error": "#ffffff",
+        "primary-fixed": "#e2e2e2",
+        "on-primary-fixed-variant": "#474747",
+        "error": "#ba1a1a",
+        "surface-tint": "#5e5e5e",
+        "inverse-surface": "#2f3131",
+        "on-tertiary-fixed": "#1b1b1b",
+        "on-error-container": "#93000a",
+        "tertiary": "#000000",
+        "surface": "#ffffff",
+        "on-primary-container": "#848484",
+        "on-secondary": "#ffffff",
+        "on-primary-fixed": "#1b1b1b",
+        "error-container": "#ffdad6",
+        "on-secondary-container": "#626363",
+        "surface-container-high": "#e8e8e8",
+        "on-secondary-fixed": "#1a1c1c",
+        "on-surface": "#1a1c1c",
+        "surface-container": "#eeeeee",
+        "on-background": "#1a1c1c",
+        "tertiary-container": "#1b1b1b",
+        "primary-fixed-dim": "#c6c6c6",
+        "secondary": "#5d5e5f",
+        "surface-container-highest": "#e3e2e2",
+        "secondary-fixed": "#e3e2e2",
+        "on-secondary-fixed-variant": "#464747",
+        "surface-dim": "#dadada",
+        "outline-variant": "#cfc4c5",
+        "tertiary-fixed": "#e2e2e2",
+        "surface-container-low": "#f4f3f3",
+        "inverse-primary": "#c6c6c6",
+        "primary-container": "#1b1b1b",
+        "secondary-fixed-dim": "#c6c6c6",
+        "surface-container-lowest": "#ffffff",
+        "surface-bright": "#ffffff",
+        "on-tertiary-container": "#848484",
+        "secondary-container": "#e0dfdf"
+      },
+      fontFamily: {
+        "headline": ["Inter"],
+        "body": ["Inter"],
+        "label": ["Space Grotesk"]
+      },
+      borderRadius: {
+        "none": "0px",
+        "DEFAULT": "0px",
+        "lg": "0px",
+        "xl": "0px",
+        "full": "9999px"
+      }
+    },
+  },
+}
