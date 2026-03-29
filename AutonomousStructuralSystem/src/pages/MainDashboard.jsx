@@ -1,5 +1,6 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../components/auth/AuthBridge';
 import Sidebar from '../components/layout/Sidebar';
 import Topbar from '../components/layout/Topbar';
 import ModelGallery from '../components/dashboard/ModelGallery';
@@ -9,7 +10,7 @@ import SpinningHouse from '../components/dashboard/SpinningHouse';
 
 const containerVariants = {
   hidden: { opacity: 0 },
-  visible: { 
+  visible: {
     opacity: 1,
     transition: { delayChildren: 0.2, staggerChildren: 0.15 }
   }
@@ -17,29 +18,20 @@ const containerVariants = {
 
 const itemVariants = {
   hidden: { opacity: 0, y: 20, scale: 0.95 },
-  visible: { 
-    opacity: 1, 
-    y: 0, 
+  visible: {
+    opacity: 1,
+    y: 0,
     scale: 1,
     transition: { type: "spring", stiffness: 100, damping: 20 }
   }
 };
 
-const galleryVariants = {
-  hidden: { opacity: 0, y: 100 },
-  visible: { 
-      opacity: 1, 
-      y: 0,
-      transition: { delay: 1, type: "spring", stiffness: 80, damping: 20 }
-  }
-};
-
 const NavigationCard = ({ icon, title, subtitle, status, isGuest, translateClasses, onClick }) => (
-  <div 
+  <div
     className={`absolute top-1/2 left-1/2 ${translateClasses} z-20 pointer-events-none`}
     style={{ marginTop: '-50px', marginLeft: '-128px' }}
   >
-    <motion.div 
+    <motion.div
       variants={itemVariants}
       whileHover={isGuest ? {} : { scale: 1.02 }}
       onClick={isGuest ? undefined : onClick}
@@ -61,7 +53,8 @@ const NavigationCard = ({ icon, title, subtitle, status, isGuest, translateClass
 const MainDashboard = ({ models = [] }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const isGuest = false; // Overriding from state to disable guest locking
+  const { isSignedIn } = useAuth();
+  const isGuest = location.state?.guest && !isSignedIn;
 
   return (
     <div className="bg-white text-black w-screen min-h-screen relative font-body overflow-x-hidden z-0">
@@ -69,10 +62,10 @@ const MainDashboard = ({ models = [] }) => {
       <Sidebar />
 
       {/* Main Canvas Context - First 100vh Screen */}
-      <main className="relative z-10 w-full h-[100vh] pointer-events-auto architectural-grid">
+      <main className="relative z-10 w-full h-[100vh] pointer-events-none architectural-grid">
         
         {/* Absolute Top Right System Status (Swiss Minimal) */}
-        <motion.div 
+        <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.8, duration: 0.5 }}
@@ -94,7 +87,7 @@ const MainDashboard = ({ models = [] }) => {
         </motion.div>
 
         {/* Central 3D Canvas wrapper */}
-        <motion.div 
+        <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 1.5, ease: "easeOut" }}
@@ -117,7 +110,7 @@ const MainDashboard = ({ models = [] }) => {
         </motion.div>
 
         {/* Radial Layout Container for Nodes */}
-        <motion.div 
+        <motion.div
             variants={containerVariants}
             initial="hidden"
             animate="visible"
@@ -129,19 +122,19 @@ const MainDashboard = ({ models = [] }) => {
                 title="3D Playground" 
                 subtitle="Live Architecture Editor" 
                 status="MOD: INTERACT" 
-                isGuest={false} 
+                isGuest={isGuest} 
                 translateClasses="-translate-x-[20rem] -translate-y-[12rem] xl:-translate-x-[24rem]" 
-                onClick={() => navigate('/3dplayground')}
+                onClick={() => navigate('/playground')}
             />
 
             {/* Bottom Left */}
-            <NavigationCard 
-                icon="edit_square" 
-                title="2D Sketchpad" 
-                subtitle="Floorplan Layout System" 
-                status="MOD: DRAFT" 
-                isGuest={isGuest} 
-                translateClasses="-translate-x-[20rem] translate-y-[12rem] xl:-translate-x-[24rem]" 
+            <NavigationCard
+                icon="edit_square"
+                title="2D Sketchpad"
+                subtitle="Floorplan Layout System"
+                status="MOD: DRAFT"
+                isGuest={isGuest}
+                translateClasses="-translate-x-[20rem] translate-y-[12rem] xl:-translate-x-[24rem]"
             />
 
             {/* Top Right */}
@@ -150,7 +143,7 @@ const MainDashboard = ({ models = [] }) => {
                 title="Analyze Game" 
                 subtitle="High-fidelity 3D Render" 
                 status="MOD: RENDER" 
-                isGuest={false} 
+                isGuest={isGuest} 
                 translateClasses="translate-x-[20rem] -translate-y-[12rem] xl:translate-x-[24rem]" 
                 onClick={() => navigate('/dashboard/game-select')}
             />
@@ -161,9 +154,9 @@ const MainDashboard = ({ models = [] }) => {
                 title="Upload Plans" 
                 subtitle="CAD / Blueprint Importer" 
                 status="MOD: INPUT_NODE" 
-                isGuest={false} 
+                isGuest={isGuest} 
                 translateClasses="translate-x-[20rem] translate-y-[12rem] xl:translate-x-[24rem]" 
-                onClick={() => navigate('/playground')}
+                onClick={() => navigate('/upload')}
             />
         </motion.div>
       </main>
@@ -171,7 +164,8 @@ const MainDashboard = ({ models = [] }) => {
       {/* Model Gallery Below Fold */}
       <section className="relative w-full z-20 bg-white border-t border-black pointer-events-auto">
           <div className="max-w-7xl mx-auto">
-              <ModelGallery models={models} />
+              {/* Note: Merged both props here! */}
+              <ModelGallery locked={isGuest} models={models} />
           </div>
       </section>
     </div>

@@ -1,9 +1,11 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
+import { SignedIn, SignedOut, SignInButton, UserButton, useAuth } from '../auth/AuthBridge';
 
 const Topbar = () => {
   const location = useLocation();
-  const isGuest = location.state?.guest;
+  const { isSignedIn } = useAuth();
+  const isGuest = location.state?.guest && !isSignedIn;
 
   return (
     <header className="fixed top-0 w-full border-b border-black bg-white z-50 flex justify-between items-center px-6 h-16">
@@ -33,9 +35,18 @@ const Topbar = () => {
         <div className="flex items-center gap-4">
           <span className="material-symbols-outlined cursor-pointer">grid_view</span>
           <span className="material-symbols-outlined cursor-pointer">settings</span>
-          <button className="bg-black text-white px-4 py-2 font-['Space_Grotesk'] text-xs uppercase tracking-widest hover:bg-white hover:text-black border border-black transition-none">
-            {isGuest ? '[ AUTHENTICATION REQUIRED ]' : '[ SYS_ADMIN_ACTIVE ]'}
-          </button>
+          
+          <SignedOut>
+            <SignInButton mode="modal">
+              <button className="bg-black text-white px-4 py-2 font-['Space_Grotesk'] text-xs uppercase tracking-widest hover:bg-white hover:text-black border border-black transition-none">
+                [ AUTHENTICATE ]
+              </button>
+            </SignInButton>
+          </SignedOut>
+          
+          <SignedIn>
+            <UserButton afterSignOutUrl="/" />
+          </SignedIn>
         </div>
       </div>
     </header>

@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import axios from 'axios';
 import { ClerkProviderWrapper } from './components/auth/ClerkProviderWrapper';
 import Login from './pages/Login';
+import SignUp from './pages/SignUp';
 import MainDashboard from './pages/MainDashboard';
 import Playground3D from './components/playgrounds/Playground3D';
 import Upload from './components/playgrounds/Upload';
@@ -27,18 +28,26 @@ function App() {
   }, []);
 
   return (
-    <ClerkProviderWrapper>
-      <Router>
+    <Router>
+      <ClerkProviderWrapper>
         <Routes>
+          {/* Public / Auth Routes */}
           <Route path="/" element={<Login />} />
+          <Route path="/signup" element={<SignUp />} />
+
+          {/* Main Dashboard & Generation Flow */}
           <Route path="/dashboard" element={<MainDashboard models={generatedModels} />} />
-          <Route path="/3dplayground" element={<Playground3D setGeneratedModels={setGeneratedModels} />} />
-          <Route path="/playground" element={<Upload />} />
+          <Route path="/playground" element={<Playground3D setGeneratedModels={setGeneratedModels} />} />
+
+          {/* Note: I changed the path for Upload to avoid colliding with Playground3D */}
+          <Route path="/upload" element={<Upload />} /> 
+
+          {/* Immersive 3D Game Viewer Flow */}
           <Route path="/dashboard/game-select" element={<GameSelection models={generatedModels} />} />
           <Route path="/dashboard/game/:id" element={<GameViewer models={generatedModels} />} />
-        </Routes>
-      </Router>
-    </ClerkProviderWrapper>
+      </Routes>
+      </ClerkProviderWrapper>
+    </Router>
   );
 }
 
