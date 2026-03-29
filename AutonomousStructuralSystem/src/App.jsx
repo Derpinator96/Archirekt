@@ -5,6 +5,7 @@ import { ClerkProviderWrapper } from './components/auth/ClerkProviderWrapper';
 import Login from './pages/Login';
 import MainDashboard from './pages/MainDashboard';
 import Playground3D from './components/playgrounds/Playground3D';
+import Upload from './components/playgrounds/Upload';
 import GameViewer from './components/playgrounds/GameViewer';
 import GameSelection from './pages/GameSelection';
 import './App.css';
@@ -31,7 +32,8 @@ function App() {
         <Routes>
           <Route path="/" element={<Login />} />
           <Route path="/dashboard" element={<MainDashboard models={generatedModels} />} />
-          <Route path="/dashboard/playground" element={<Playground3D setGeneratedModels={setGeneratedModels} />} />
+          <Route path="/3dplayground" element={<Playground3D setGeneratedModels={setGeneratedModels} />} />
+          <Route path="/playground" element={<Upload />} />
           <Route path="/dashboard/game-select" element={<GameSelection models={generatedModels} />} />
           <Route path="/dashboard/game/:id" element={<GameViewer models={generatedModels} />} />
         </Routes>

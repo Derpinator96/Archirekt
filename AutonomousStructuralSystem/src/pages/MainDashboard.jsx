@@ -69,7 +69,7 @@ const MainDashboard = ({ models = [] }) => {
       <Sidebar />
 
       {/* Main Canvas Context - First 100vh Screen */}
-      <main className="relative z-10 w-full h-[100vh] pointer-events-none architectural-grid">
+      <main className="relative z-10 w-full h-[100vh] pointer-events-auto architectural-grid">
         
         {/* Absolute Top Right System Status (Swiss Minimal) */}
         <motion.div 
@@ -129,8 +129,9 @@ const MainDashboard = ({ models = [] }) => {
                 title="3D Playground" 
                 subtitle="Live Architecture Editor" 
                 status="MOD: INTERACT" 
-                isGuest={isGuest} 
+                isGuest={false} 
                 translateClasses="-translate-x-[20rem] -translate-y-[12rem] xl:-translate-x-[24rem]" 
+                onClick={() => navigate('/3dplayground')}
             />
 
             {/* Bottom Left */}
@@ -149,7 +150,7 @@ const MainDashboard = ({ models = [] }) => {
                 title="Analyze Game" 
                 subtitle="High-fidelity 3D Render" 
                 status="MOD: RENDER" 
-                isGuest={isGuest} 
+                isGuest={false} 
                 translateClasses="translate-x-[20rem] -translate-y-[12rem] xl:translate-x-[24rem]" 
                 onClick={() => navigate('/dashboard/game-select')}
             />
@@ -160,9 +161,9 @@ const MainDashboard = ({ models = [] }) => {
                 title="Upload Plans" 
                 subtitle="CAD / Blueprint Importer" 
                 status="MOD: INPUT_NODE" 
-                isGuest={isGuest} 
+                isGuest={false} 
                 translateClasses="translate-x-[20rem] translate-y-[12rem] xl:translate-x-[24rem]" 
-                onClick={() => navigate('/dashboard/playground')}
+                onClick={() => navigate('/playground')}
             />
         </motion.div>
       </main>
