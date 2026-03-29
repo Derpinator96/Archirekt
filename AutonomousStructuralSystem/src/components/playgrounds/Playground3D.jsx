@@ -33,14 +33,18 @@ export default function Playground3D({ setGeneratedModels }) {
   const handleSave = async () => {
     if (elements.length === 0) return;
     setIsSaving(true);
+    const id = generateId();
+    const modelData = {
+      id: id,
+      name: `Design_${new Date().toISOString().slice(0,10)}_${id}`,
+      date: new Date().toLocaleDateString(),
+      timestamp: new Date().toISOString(),
+      elements: elements,
+      thumbnail: "https://placehold.co/400x500/FFFFFF/000000?text=Architectural+Draft" // Mock thumbnail
+    };
+    
     try {
-      const modelData = {
-        name: `Design_${new Date().toISOString().slice(0,10)}_${generateId()}`,
-        elements: elements,
-        timestamp: new Date().toISOString()
-      };
-      
-      // Mocking a backend save
+      // Persist to backend (Hydrated in App.jsx)
       const res = await axios.post('http://localhost:8000/api/models', modelData);
       if (res.data) {
         setGeneratedModels(prev => [...prev, res.data]);
@@ -49,7 +53,7 @@ export default function Playground3D({ setGeneratedModels }) {
     } catch (err) {
       console.error("Save failed:", err);
       // Fallback for UI if backend is not up
-      setGeneratedModels(prev => [...prev, { id: generateId(), ...modelData }]);
+      setGeneratedModels(prev => [...prev, modelData]);
       alert("LOCAL PERSISTENCE ACTIVE (REMOTE OFFLINE)");
     }
     setIsSaving(false);
