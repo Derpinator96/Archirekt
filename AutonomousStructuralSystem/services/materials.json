@@ -1,0 +1,9 @@
+[
+  { "material": "AAC Blocks", "cost": "Low", "strength": "Medium", "durability": "High", "bestUse": "Partition walls" },
+  { "material": "Red Brick", "cost": "Medium", "strength": "High", "durability": "Medium", "bestUse": "Load-bearing walls" },
+  { "material": "RCC", "cost": "High", "strength": "Very High", "durability": "Very High", "bestUse": "Columns, slabs" },
+  { "material": "Steel Frame", "cost": "High", "strength": "Very High", "durability": "Very High", "bestUse": "Long spans (>5m)" },
+  { "material": "Hollow Concrete Block", "cost": "Low-Med", "strength": "Medium", "durability": "Medium", "bestUse": "Non-structural walls" },
+  { "material": "Fly Ash Brick", "cost": "Low", "strength": "Medium-High", "durability": "High", "bestUse": "General walling" },
+  { "material": "Precast Concrete Panel", "cost": "Med-High", "strength": "High", "durability": "Very High", "bestUse": "Structural walls, slabs" }
+]

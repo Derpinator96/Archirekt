@@ -1,28 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React from 'react';
 
-const ModelGallery = ({ locked }) => {
-  const [models, setModels] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-     const fetchModels = async () => {
-         try {
-             // In production this would point to a relative /api route
-             const res = await axios.get('http://localhost:8000/api/models');
-             setModels(res.data);
-         } catch (e) {
-             console.error("Failed to load models index", e);
-         }
-         setLoading(false);
-     };
-     fetchModels();
-  }, []);
+const ModelGallery = ({ models = [] }) => {
+  const loading = false;
 
   return (
     <div className="w-full py-6 z-30">
       <div className="flex justify-between items-end mb-4 px-12">
-        <h4 className="font-label text-[10px] tracking-[0.3em] uppercase">REPOSITORY // GENERATED_MODELS {locked && '[LOCKED: READ ONLY]'}</h4>
+        <h4 className="font-label text-[10px] tracking-[0.3em] uppercase">REPOSITORY // GENERATED_MODELS</h4>
         <div className="flex gap-2">
           <button className="border border-black p-1 hover:bg-black hover:text-white transition-none cursor-pointer">
             <span className="material-symbols-outlined text-sm">chevron_left</span>
@@ -33,7 +17,7 @@ const ModelGallery = ({ locked }) => {
         </div>
       </div>
 
-      <div className={`flex gap-6 overflow-x-auto pb-6 scrollbar-hide px-12 ${locked ? 'opacity-80' : ''}`}>
+      <div className={`flex gap-6 overflow-x-auto pb-6 scrollbar-hide px-12`}>
         
         {loading && (
              <div className="flex-shrink-0 w-64 border border-black bg-white flex items-center justify-center h-48">
@@ -69,11 +53,7 @@ const ModelGallery = ({ locked }) => {
                   src={model.thumbnail}
                 />
                 
-                {locked && (
-                  <div className="absolute inset-0 bg-white/50 flex items-center justify-center">
-                    <span className="material-symbols-outlined text-4xl text-black">lock</span>
-                  </div>
-                )}
+                 {/* Lock overlay removed */}
               </div>
               <div className="p-3 font-mono">
                 <div className="text-[8px] text-gray-500 leading-tight">ID: {model.id}</div>
