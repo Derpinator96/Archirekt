@@ -1,27 +1,9 @@
-import React, { useState } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
-import { ScrollControls, useScroll, Environment, Grid } from '@react-three/drei';
+import React, { useState, useMemo } from 'react';
+import { Canvas } from '@react-three/fiber';
+import { OrbitControls, PerspectiveCamera, Environment, Grid, Edges } from '@react-three/drei';
 import * as THREE from 'three';
 import axios from 'axios';
 
-const SceneCamera = () => {
-    const scroll = useScroll();
-    
-    useFrame((state) => {
-        const offset = scroll.offset; // 0 to 1
-        
-        // Lerp camera from Top-down (Y=25) to First-person inside (Y=1.5, Z=8)
-        const targetPosY = THREE.MathUtils.lerp(25, 1.5, offset);
-        const targetPosZ = THREE.MathUtils.lerp(0.1, 8, offset); 
-        
-        state.camera.position.lerp(new THREE.Vector3(0, targetPosY, targetPosZ), 0.1);
-        
-        const targetLookY = THREE.MathUtils.lerp(0, 1.5, offset);
-        state.camera.lookAt(0, targetLookY, 0);
-    });
-    
-    return null;
-}
 
 const WallMesh = ({ startX, startY, endX, endY, thickness, isLoadBearing, hasWindow, hasDoor }) => {
     const length = Math.hypot(endX - startX, endY - startY);
@@ -29,22 +11,29 @@ const WallMesh = ({ startX, startY, endX, endY, thickness, isLoadBearing, hasWin
     const midX = (startX + endX) / 2;
     const midZ = (startY + endY) / 2;
     const height = 3.0; 
-
-    // Render material parameters (Architectural Plaster / Concrete)
-    const renderMaterial = () => (
+    
+    // Memoize materials to prevent allocation pressure
+    const wallMaterial = useMemo(() => (
         <meshStandardMaterial 
             color={isLoadBearing ? "#e2e2e2" : "#ffffff"} 
             roughness={0.8}
             metalness={0.05}
         />
-    );
+    ), [isLoadBearing]);
 
-    const renderOutline = (l, h, t) => (
-        <lineSegments>
-            <edgesGeometry attach="geometry" args={[new THREE.BoxGeometry(l, h, t)]} />
-            <lineBasicMaterial attach="material" color="black" linewidth={1} opacity={0.2} transparent />
-        </lineSegments>
-    );
+    const doorMaterial = useMemo(() => (
+        <meshStandardMaterial color="#1a1a1a" roughness={0.9} />
+    ), []);
+
+    const glassMaterial = useMemo(() => (
+        <meshPhysicalMaterial 
+            color="#88ccff" 
+            transmission={0.8} 
+            opacity={1} 
+            roughness={0.1}
+            metalness={0.2}
+        />
+    ), []);
 
     // Architectural Door Generator
     if (hasDoor && length > 2) {
@@ -56,23 +45,23 @@ const WallMesh = ({ startX, startY, endX, endY, thickness, isLoadBearing, hasWin
             <group position={[midX, 0, midZ]} rotation={[0, -angle, 0]}>
                 <mesh position={[-length/2 + remainder/4, height/2, 0]}>
                     <boxGeometry args={[remainder/2, height, thickness]} />
-                    {renderMaterial()}
-                    {renderOutline(remainder/2, height, thickness)}
+                    {wallMaterial}
+                    <Edges color="black" opacity={0.2} transparent />
                 </mesh>
                 <mesh position={[length/2 - remainder/4, height/2, 0]}>
                     <boxGeometry args={[remainder/2, height, thickness]} />
-                    {renderMaterial()}
-                    {renderOutline(remainder/2, height, thickness)}
+                    {wallMaterial}
+                    <Edges color="black" opacity={0.2} transparent />
                 </mesh>
                 <mesh position={[0, height - (height - doorHeight)/2, 0]}>
                     <boxGeometry args={[doorWidth, height - doorHeight, thickness]} />
-                    {renderMaterial()}
-                    {renderOutline(doorWidth, height - doorHeight, thickness)}
+                    {wallMaterial}
+                    <Edges color="black" opacity={0.2} transparent />
                 </mesh>
                 {/* Actual Wood Door Pane */}
                 <mesh position={[0, doorHeight/2, 0]}>
                     <boxGeometry args={[doorWidth - 0.05, doorHeight - 0.05, 0.05]} />
-                    <meshStandardMaterial color="#1a1a1a" roughness={0.9} />
+                    {doorMaterial}
                 </mesh>
             </group>
         );
@@ -89,34 +78,28 @@ const WallMesh = ({ startX, startY, endX, endY, thickness, isLoadBearing, hasWin
             <group position={[midX, 0, midZ]} rotation={[0, -angle, 0]}>
                 <mesh position={[-length/2 + remainder/4, height/2, 0]}>
                     <boxGeometry args={[remainder/2, height, thickness]} />
-                    {renderMaterial()}
-                    {renderOutline(remainder/2, height, thickness)}
+                    {wallMaterial}
+                    <Edges color="black" opacity={0.2} transparent />
                 </mesh>
                 <mesh position={[length/2 - remainder/4, height/2, 0]}>
                     <boxGeometry args={[remainder/2, height, thickness]} />
-                    {renderMaterial()}
-                    {renderOutline(remainder/2, height, thickness)}
+                    {wallMaterial}
+                    <Edges color="black" opacity={0.2} transparent />
                 </mesh>
                 <mesh position={[0, sillHeight/2, 0]}>
                     <boxGeometry args={[winWidth, sillHeight, thickness]} />
-                    {renderMaterial()}
-                    {renderOutline(winWidth, sillHeight, thickness)}
+                    {wallMaterial}
+                    <Edges color="black" opacity={0.2} transparent />
                 </mesh>
                 <mesh position={[0, height - topHeight/2, 0]}>
                     <boxGeometry args={[winWidth, topHeight, thickness]} />
-                    {renderMaterial()}
-                    {renderOutline(winWidth, topHeight, thickness)}
+                    {wallMaterial}
+                    <Edges color="black" opacity={0.2} transparent />
                 </mesh>
                 {/* Physical Glass Pane */}
                 <mesh position={[0, sillHeight + winHeight/2, 0]}>
                     <boxGeometry args={[winWidth, winHeight, 0.02]} />
-                    <meshPhysicalMaterial 
-                        color="#88ccff" 
-                        transmission={0.8} 
-                        opacity={1} 
-                        roughness={0.1}
-                        metalness={0.2}
-                    />
+                    {glassMaterial}
                 </mesh>
             </group>
         );
@@ -126,25 +109,23 @@ const WallMesh = ({ startX, startY, endX, endY, thickness, isLoadBearing, hasWin
     return (
         <mesh position={[midX, height/2, midZ]} rotation={[0, -angle, 0]}>
             <boxGeometry args={[length, height, thickness]} />
-            {renderMaterial()}
-            {renderOutline(length, height, thickness)}
+            {wallMaterial}
+            <Edges color="black" opacity={0.2} transparent />
         </mesh>
     );
 };
 
 const FloorPlanModels = ({ walls }) => {
+    const wallMeshes = useMemo(() => {
+        return walls.map((wall, i) => (
+            <WallMesh key={i} {...wall} />
+        ));
+    }, [walls]);
+
     return (
         <group>
-            {/* Ground Plane */}
-            <Grid infiniteGrid fadeDistance={40} sectionColor="#aaaaaa" cellColor="#dddddd" />
-            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]}>
-                <planeGeometry args={[100, 100]} />
-                <meshStandardMaterial color="#ffffff" roughness={1} />
-            </mesh>
-
-            {walls.map((wall, i) => (
-                <WallMesh key={i} {...wall} />
-            ))}
+            <Grid infiniteGrid fadeDistance={50} sectionColor="#aaaaaa" cellColor="#dddddd" position={[0, -0.01, 0]} />
+            {wallMeshes}
         </group>
     );
 }
@@ -160,6 +141,7 @@ const Upload = ({ locked }) => {
   
   const [walls, setWalls] = useState(initialWalls);
   const [loading, setLoading] = useState(false);
+  const [uploadTimestamp, setUploadTimestamp] = useState(Date.now());
 
   const handleUpload = async (e) => {
       const file = e.target.files[0];
@@ -171,6 +153,7 @@ const Upload = ({ locked }) => {
           const res = await axios.post('http://localhost:8000/api/parse-floorplan', formData);
           if (res.data.walls && res.data.walls.length > 0) {
               setWalls(res.data.walls);
+              setUploadTimestamp(Date.now());
           } else {
               alert("No structural geometry found. Please ensure the blueprint has clear, distinct walls.");
           }
@@ -220,15 +203,14 @@ const Upload = ({ locked }) => {
 
       {/* 3D Viewport Area */}
       <div className={`absolute inset-0 z-0 ${locked ? 'opacity-40 grayscale blur-[2px] pointer-events-none' : ''}`}>
-         <Canvas camera={{ position: [0, 25, 0.1], fov: 45 }}>
+         <Canvas key={uploadTimestamp}>
+            <PerspectiveCamera makeDefault position={[15, 20, 15]} fov={50} />
+            <OrbitControls makeDefault minDistance={1} maxDistance={500} />
             <ambientLight intensity={1.5} />
             <directionalLight position={[10, 20, 10]} castShadow intensity={1.5} />
             <Environment preset="city" />
-            
-            <ScrollControls pages={3} damping={0.25}>
-                <SceneCamera />
-                <FloorPlanModels walls={walls} />
-            </ScrollControls>
+            <axesHelper args={[5]} />
+            <FloorPlanModels walls={walls} />
         </Canvas>
       </div>
 

@@ -18,7 +18,7 @@ from openai import AsyncOpenAI
 
 load_dotenv()
 
-SNAPPING_TOLERANCE_PX = 15
+SNAPPING_TOLERANCE_PX = 25
 OPENAI_CLIENT = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 app = FastAPI(title="A.S.I.S. Floor Parser")
@@ -133,8 +133,8 @@ async def parse_floorplan(file: UploadFile = File(...)):
     
     edges = cv2.Canny(closed, 50, 150, apertureSize=3)
     
-    # Hough Lines Extraction
-    lines = cv2.HoughLinesP(edges, 1, np.pi/180, threshold=100, minLineLength=60, maxLineGap=20)
+    # Hough Lines Extraction: Higher threshold and longer min length for structural stability
+    lines = cv2.HoughLinesP(edges, 1, np.pi/180, threshold=120, minLineLength=80, maxLineGap=30)
     
     walls = []
     
@@ -152,86 +152,105 @@ async def parse_floorplan(file: UploadFile = File(...)):
             mapped_y2 = (y2 * scale_y) - 10
             
             line_geom = LineString([(mapped_x1, mapped_y1), (mapped_x2, mapped_y2)])
-            if line_geom.length < 0.5:
+            if line_geom.length < 1.0: # Filter small noise
                 continue
             processed_lines.append(line_geom)
             
-        # 1. COLLINEAR MERGING & 2. CORNER SNAPPING
+        # 1. PROJECTIVE CENTERLINE REDUCTION (Iterative Parallel Merging)
         snapping_dist = SNAPPING_TOLERANCE_PX * scale_x
         
-        def merge_lines(lines_to_merge):
+        def merge_lines_pass(lines_to_merge):
             merged = []
             for l in lines_to_merge:
                 is_merged = False
                 for i, ml in enumerate(merged):
-                    # If lines are very close and parallel (similar slope via buffering)
-                    if l.distance(ml) < snapping_dist * 0.5:
-                        # Angle check
-                        dx1, dy1 = l.coords[1][0] - l.coords[0][0], l.coords[1][1] - l.coords[0][1]
-                        dx2, dy2 = ml.coords[1][0] - ml.coords[0][0], ml.coords[1][1] - ml.coords[0][1]
-                        a1, a2 = math.atan2(dy1, dx1), math.atan2(dy2, dx2)
-                        
-                        # Normalize angles to [0, pi) for parallel check
-                        a1 = a1 % math.pi
-                        a2 = a2 % math.pi
-                        if abs(a1 - a2) < 0.2 or abs(a1 - a2) > (math.pi - 0.2):
-                            # Collinear and close: merge by grabbing outermost points
+                    dx1, dy1 = l.coords[1][0] - l.coords[0][0], l.coords[1][1] - l.coords[0][1]
+                    dx2, dy2 = ml.coords[1][0] - ml.coords[0][0], ml.coords[1][1] - ml.coords[0][1]
+                    a1, a2 = math.atan2(dy1, dx1), math.atan2(dy2, dx2)
+                    
+                    # Normalize angles to [0, pi) for parallel check
+                    a1 = a1 % math.pi
+                    a2 = a2 % math.pi
+                    
+                    if abs(a1 - a2) < 0.2 or abs(a1 - a2) > (math.pi - 0.2):
+                        # They are roughly parallel, check if they overlap or are very close
+                        if l.distance(ml) < snapping_dist * 2.0: 
                             pts = list(l.coords) + list(ml.coords)
-                            # Find two points that maximize distance
-                            max_d = 0
-                            best_pair = (pts[0], pts[1])
-                            for p1 in pts:
-                                for p2 in pts:
-                                    d = math.hypot(p1[0]-p2[0], p1[1]-p2[1])
-                                    if d > max_d:
-                                        max_d = d
-                                        best_pair = (p1, p2)
                             
-                            merged[i] = LineString([best_pair[0], best_pair[1]])
+                            ux = math.cos(a2)
+                            uy = math.sin(a2)
+                            nx = -uy
+                            ny = ux
+                            
+                            ref_x, ref_y = ml.coords[0][0], ml.coords[0][1]
+                            
+                            proj_u = []
+                            proj_n = []
+                            for p in pts:
+                                vec_x = p[0] - ref_x
+                                vec_y = p[1] - ref_y
+                                proj_u.append(vec_x * ux + vec_y * uy)
+                                proj_n.append(vec_x * nx + vec_y * ny)
+                                
+                            min_u = min(proj_u)
+                            max_u = max(proj_u)
+                            avg_n = sum(proj_n) / len(proj_n)
+                            
+                            new_p1 = (ref_x + min_u * ux + avg_n * nx, ref_y + min_u * uy + avg_n * ny)
+                            new_p2 = (ref_x + max_u * ux + avg_n * nx, ref_y + max_u * uy + avg_n * ny)
+                            
+                            merged[i] = LineString([new_p1, new_p2])
                             is_merged = True
                             break
                 if not is_merged:
                     merged.append(l)
             return merged
 
-        # Execute Collinear Merge
-        merged_lines = merge_lines(processed_lines)
-        
-        # Execute Corner Snapping
-        endpoints = []
-        for ml in merged_lines:
-            endpoints.extend(list(ml.coords))
+        merged_lines = processed_lines
+        for _ in range(3):
+            merged_lines = merge_lines_pass(merged_lines)
             
-        # Group close endpoints into clusters
-        clusters = []
-        for ep in endpoints:
-            found_cluster = False
-            for cluster in clusters:
-                if math.hypot(ep[0]-cluster[0][0], ep[1]-cluster[0][1]) < snapping_dist:
-                    cluster.append(ep)
-                    found_cluster = True
-                    break
-            if not found_cluster:
-                clusters.append([ep])
+        # 2. STRICT CORNER SNAPPING (Mathematical Extension)
+        # Snap endpoints of perpendicular (or intersecting) lines mathematically if they fall just short of each other.
+        for i in range(len(merged_lines)):
+            for j in range(i + 1, len(merged_lines)):
+                l1 = merged_lines[i]
+                l2 = merged_lines[j]
                 
-        # Calculate centroids of clusters
-        snapped_nodes = {}
-        for cluster in clusters:
-            cx = sum(p[0] for p in cluster) / len(cluster)
-            cy = sum(p[1] for p in cluster) / len(cluster)
-            for p in cluster:
-                snapped_nodes[p] = (cx, cy)
+                # Check distances between all 4 endpoint combinations
+                ext_dist = [
+                    (0, 0, math.hypot(l1.coords[0][0]-l2.coords[0][0], l1.coords[0][1]-l2.coords[0][1])),
+                    (0, 1, math.hypot(l1.coords[0][0]-l2.coords[1][0], l1.coords[0][1]-l2.coords[1][1])),
+                    (1, 0, math.hypot(l1.coords[1][0]-l2.coords[0][0], l1.coords[1][1]-l2.coords[0][1])),
+                    (1, 1, math.hypot(l1.coords[1][0]-l2.coords[1][0], l1.coords[1][1]-l2.coords[1][1]))
+                ]
                 
-        # Remap lines to snapped endpoints
-        filtered_lines = []
-        for ml in merged_lines:
-            p1, p2 = ml.coords[0], ml.coords[1]
-            new_p1 = snapped_nodes.get(p1, p1)
-            new_p2 = snapped_nodes.get(p2, p2)
-            dist = math.hypot(new_p1[0]-new_p2[0], new_p1[1]-new_p2[1])
-            if dist > 0.1:
-                filtered_lines.append(LineString([new_p1, new_p2]))
+                # Pick the two endpoints nearest each other
+                best_pair = min(ext_dist, key=lambda x: x[2])
                 
+                # If they are very near but not identical
+                if best_pair[2] > 0.05 and best_pair[2] < snapping_dist * 2.0:
+                    x1, y1 = l1.coords[0]
+                    x2, y2 = l1.coords[1]
+                    x3, y3 = l2.coords[0]
+                    x4, y4 = l2.coords[1]
+                    
+                    denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
+                    if abs(denom) > 1e-6: # Protect against completely parallel lines bypassing merge
+                        int_x = ((x1 * y2 - y1 * x2) * (x3 - x4) - (x1 - x2) * (x3 * y4 - y3 * x4)) / denom
+                        int_y = ((x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - y3 * x4)) / denom
+                        
+                        # Verify the mathematical intersection doesn't blast the line millions of miles into space
+                        if math.hypot(l1.coords[best_pair[0]][0] - int_x, l1.coords[best_pair[0]][1] - int_y) < snapping_dist * 3.0:
+                            l1_coords = list(l1.coords)
+                            l1_coords[best_pair[0]] = (int_x, int_y)
+                            merged_lines[i] = LineString(l1_coords)
+                            
+                            l2_coords = list(l2.coords)
+                            l2_coords[best_pair[1]] = (int_x, int_y)
+                            merged_lines[j] = LineString(l2_coords)
+                            
+        filtered_lines = merged_lines
         # Sort by length and cap to top 150 to prevent frontend WebGL Context Lost
         filtered_lines.sort(key=lambda x: x.length, reverse=True)
         filtered_lines = filtered_lines[:150]

@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrthographicCamera, OrbitControls, Edges } from '@react-three/drei';
+import { PerspectiveCamera, OrbitControls, Edges, Grid } from '@react-three/drei';
 import * as THREE from 'three';
 import axios from 'axios';
 
@@ -16,10 +16,12 @@ export default function Playground3D({ setGeneratedModels }) {
   const [previewEnd, setPreviewEnd] = useState(null);
   const [loading, setLoading] = useState(false);
   const [analysis, setAnalysis] = useState(null);
+  const [uploadTimestamp, setUploadTimestamp] = useState(Date.now());
 
   const handleCreateNew = () => {
     setElements([]);
     setProjectLoaded(true);
+    setUploadTimestamp(Date.now());
   };
 
   const handleLoadRecent = () => {
@@ -30,6 +32,7 @@ export default function Playground3D({ setGeneratedModels }) {
       { id: '4', type: 'wall', start: [-5, 0, 5], end: [-5, 0, -5] }
     ]);
     setProjectLoaded(true);
+    setUploadTimestamp(Date.now());
   };
 
   const handleUpload = async (e) => {
@@ -53,6 +56,7 @@ export default function Playground3D({ setGeneratedModels }) {
               }));
               setElements(mappedElements);
               setProjectLoaded(true);
+              setUploadTimestamp(Date.now());
               
               setAnalysis(null);
               try {
@@ -144,6 +148,43 @@ export default function Playground3D({ setGeneratedModels }) {
       setPreviewEnd([point.x, 0, point.z]);
     }
   };
+
+  const wallMeshes = useMemo(() => {
+    return elements.map((el) => {
+      if (el.type === 'wall') {
+        return <Wall key={el.id} wall={el} buildMode={buildMode} elements={elements} setElements={setElements} />;
+      }
+      return null;
+    });
+  }, [elements, buildMode, setElements]);
+
+  const fallbackMeshes = useMemo(() => {
+    return elements.filter(el => el.type === 'wall' && (el.hasDoor || el.hasWindow)).flatMap((el) => {
+      const start = new THREE.Vector3(...el.start);
+      const end = new THREE.Vector3(...el.end);
+      const position = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+      const angle = Math.atan2(end.x - start.x, end.z - start.z);
+
+      const meshes = [];
+      if (el.hasDoor) {
+        meshes.push(
+          <mesh key={`${el.id}-door`} position={[position.x, 1.05, position.z]} rotation={[0, angle, 0]}>
+            <boxGeometry args={[0.25, 2.1, 1.0]} />
+            <meshPhysicalMaterial color="#8b5a2b" transparent opacity={0.6} />
+          </mesh>
+        );
+      }
+      if (el.hasWindow) {
+        meshes.push(
+          <mesh key={`${el.id}-window`} position={[position.x, 1.5, position.z]} rotation={[0, angle, 0]}>
+            <boxGeometry args={[0.25, 1.2, 1.2]} />
+            <meshPhysicalMaterial color="#4da6ff" transparent opacity={0.6} transmission={0.5} roughness={0.1} />
+          </mesh>
+        );
+      }
+      return meshes;
+    });
+  }, [elements]);
 
   if (!projectLoaded) {
     return (
@@ -244,22 +285,22 @@ export default function Playground3D({ setGeneratedModels }) {
       )}
 
       {/* 3D Canvas */}
-      <Canvas onPointerMove={startPoint ? handlePointerMove : undefined}>
+      <Canvas key={uploadTimestamp} onPointerMove={startPoint ? handlePointerMove : undefined}>
         <color attach="background" args={['white']} />
         
-        <OrthographicCamera makeDefault position={[50, 50, 50]} zoom={20} near={-500} far={1000} />
+        <PerspectiveCamera makeDefault position={[15, 20, 15]} fov={50} />
         <OrbitControls 
           makeDefault 
-          maxPolarAngle={Math.PI / 2}
-          minDistance={10}
+          minDistance={1}
           maxDistance={500}
         />
 
         <ambientLight intensity={0.7} />
         <directionalLight position={[10, 20, 10]} intensity={1} />
 
-        {/* Floor grid */}
-        <gridHelper args={[1000, 1000, '#e5e5e5', '#f0f0f0']} position={[0, -0.01, 0]} />
+        {/* Floor grid & Axes */}
+        <Grid infiniteGrid fadeDistance={50} sectionColor="#aaaaaa" cellColor="#dddddd" position={[0, -0.01, 0]} />
+        <axesHelper args={[5]} />
 
         {/* Invisible plane to catch raycast */}
         <mesh 
@@ -274,12 +315,10 @@ export default function Playground3D({ setGeneratedModels }) {
         </mesh>
 
         {/* Render elements */}
-        {elements.map((el) => {
-          if (el.type === 'wall') {
-            return <Wall key={el.id} wall={el} buildMode={buildMode} elements={elements} setElements={setElements} />;
-          }
-          return null;
-        })}
+        {wallMeshes}
+
+        {/* Fallback Features */}
+        {fallbackMeshes}
 
         {/* Preview wall */}
         {startPoint && previewEnd && (
@@ -305,6 +344,18 @@ function Wall({ wall, buildMode, elements, setElements, isPreview }) {
   position.y = height / 2;
 
   const angle = Math.atan2(end.x - start.x, end.z - start.z);
+
+  const wallMat = useMemo(() => (
+    <meshStandardMaterial 
+      color="white" 
+      transparent={isPreview} 
+      opacity={isPreview ? 0.3 : 1}
+    />
+  ), [isPreview]);
+
+  const snapMat = useMemo(() => (
+    <meshStandardMaterial color="white" transparent opacity={0.6} depthTest={false} />
+  ), []);
 
   const [hoverPoint, setHoverPoint] = useState(null);
 
@@ -355,11 +406,7 @@ function Wall({ wall, buildMode, elements, setElements, isPreview }) {
         onPointerDown={handlePointerDown}
       >
         <boxGeometry args={[thickness, height, length]} />
-        <meshStandardMaterial 
-          color="white" 
-          transparent={isPreview} 
-          opacity={isPreview ? 0.3 : 1}
-        />
+        {wallMat}
         <Edges color="black" />
       </mesh>
 
@@ -379,7 +426,7 @@ function Wall({ wall, buildMode, elements, setElements, isPreview }) {
             buildMode === 'DOOR' ? 2.1 : 1.2, 
             buildMode === 'DOOR' ? 1.0 : 1.2
           ]} />
-          <meshStandardMaterial color="white" transparent opacity={0.6} depthTest={false} />
+          {snapMat}
           <Edges color="black" />
         </mesh>
       )}
