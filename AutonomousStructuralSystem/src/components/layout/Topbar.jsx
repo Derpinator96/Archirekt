@@ -13,20 +13,10 @@ const Topbar = () => {
         <span className="font-['Inter'] font-black text-black uppercase tracking-tighter text-2xl">
           A.S.I.S.
         </span>
-        <div className="h-8 w-px bg-black hidden md:block"></div>
-        <span className="font-['Space_Grotesk'] uppercase text-[10px] tracking-widest hidden md:block">
-          System Status: Nominal // Auth_Level: {isGuest ? 'Guest' : 'Admin'}
-        </span>
       </div>
 
       <div className="flex items-center gap-8">
         <nav className="hidden md:flex gap-6">
-          <a className="text-gray-400 font-['Space_Grotesk'] uppercase text-xs hover:text-black transition-none cursor-pointer">
-            Schematics
-          </a>
-          <a className="text-gray-400 font-['Space_Grotesk'] uppercase text-xs hover:text-black transition-none cursor-pointer">
-            Analysis
-          </a>
           <a className="text-black font-bold underline decoration-1 underline-offset-4 font-['Space_Grotesk'] uppercase text-xs cursor-pointer">
             Dashboard
           </a>
