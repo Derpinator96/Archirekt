@@ -9,6 +9,7 @@ import Playground3D from './components/playgrounds/Playground3D';
 import Upload from './components/playgrounds/Upload';
 import GameViewer from './components/playgrounds/GameViewer';
 import GameSelection from './pages/GameSelection';
+import Landing from './pages/landing';
 import './App.css';
 
 function App() {
@@ -32,7 +33,8 @@ function App() {
       <ClerkProviderWrapper>
         <Routes>
           {/* Public / Auth Routes */}
-          <Route path="/" element={<Login />} />
+          <Route path="/" element={<Landing />} />
+          <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<SignUp />} />
 
           {/* Main Dashboard & Generation Flow */}
