@@ -1,15 +1,22 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { PerspectiveCamera, OrbitControls, Edges, Grid } from '@react-three/drei';
 import * as THREE from 'three';
 import axios from 'axios';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useModelContext } from '../../context/ModelContext';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 
-export default function Playground3D({ setGeneratedModels }) {
+export default function Playground3D() {
+  const navigate = useNavigate();
+  const { modelId } = useParams();
+  const { savedModels, saveNewModel, updateExistingModel } = useModelContext();
+
   const [projectLoaded, setProjectLoaded] = useState(false);
   const [elements, setElements] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState('[ SAVE PROJECT ]');
   
   const [buildMode, setBuildMode] = useState('SELECT'); // 'SELECT', 'WALL', 'DOOR', 'WINDOW'
   const [startPoint, setStartPoint] = useState(null);
@@ -17,6 +24,22 @@ export default function Playground3D({ setGeneratedModels }) {
   const [loading, setLoading] = useState(false);
   const [analysis, setAnalysis] = useState(null);
   const [uploadTimestamp, setUploadTimestamp] = useState(Date.now());
+
+  // Load existing model if modelId is present
+  useEffect(() => {
+    if (modelId) {
+      const existingModel = savedModels.find(m => m.id === modelId);
+      if (existingModel) {
+        // Reconstruct elements from walls and doors
+        const reconstructed = [
+          ...(existingModel.walls || []),
+          ...(existingModel.doors || [])
+        ];
+        setElements(reconstructed);
+        setProjectLoaded(true);
+      }
+    }
+  }, [modelId, savedModels]);
 
   const handleCreateNew = () => {
     setElements([]);
@@ -67,13 +90,6 @@ export default function Playground3D({ setGeneratedModels }) {
               } catch(aiErr) {
                   console.error('LLM Failure:', aiErr);
               }
-              
-              try {
-                  const modelsRes = await axios.get('http://localhost:8000/api/models');
-                  if (setGeneratedModels) setGeneratedModels(modelsRes.data);
-              } catch (refreshErr) {
-                  console.error("Failed to refresh global state:", refreshErr);
-              }
           } else {
               alert("No structural geometry found. Please ensure the blueprint has clear, distinct walls.");
           }
@@ -84,40 +100,33 @@ export default function Playground3D({ setGeneratedModels }) {
       setLoading(false);
   };
 
-
-  const handleSave = async () => {
+  const handleSave = () => {
     if (elements.length === 0) return;
     setIsSaving(true);
-    const id = generateId();
-    const modelData = {
-      id: id,
-      name: `Design_${new Date().toISOString().slice(0,10)}_${id}`,
-      date: new Date().toLocaleDateString(),
-      timestamp: new Date().toISOString(),
-      elements: elements,
-      thumbnail: "https://placehold.co/400x500/FFFFFF/000000?text=Architectural+Draft" // Mock thumbnail
-    };
-    
-    try {
-      // Persist to backend (Hydrated in App.jsx)
-      const res = await axios.post('http://localhost:8000/api/models', modelData);
-      if (res.data) {
-        setGeneratedModels(prev => [...prev, res.data]);
-        alert("ARCHITECTURAL STATE PERSISTED TO SYSTEM");
-      }
-    } catch (err) {
-      console.error("Save failed:", err);
-      // Fallback for UI if backend is not up
-      setGeneratedModels(prev => [...prev, modelData]);
-      alert("LOCAL PERSISTENCE ACTIVE (REMOTE OFFLINE)");
+
+    const walls = elements.filter(el => el.type === 'wall');
+    const doors = elements.filter(el => el.type === 'door' || el.type === 'window');
+
+    if (modelId) {
+      // Update existing
+      updateExistingModel(modelId, walls, doors);
+      setSaveStatus('[ SAVED ✓ ]');
+      setTimeout(() => {
+        setSaveStatus('[ SAVE PROJECT ]');
+        setIsSaving(false);
+      }, 2000);
+    } else {
+      // New project
+      const newId = saveNewModel('Untitled Render', walls, doors);
+      // Immediately update URL to reflect the new ID
+      navigate(`/3d/${newId}`, { replace: true });
+      setIsSaving(false);
     }
-    setIsSaving(false);
   };
 
   const handlePointerDown = (e) => {
     if (buildMode !== 'WALL') return;
     e.stopPropagation();
-    
     const { point } = e;
     
     if (!startPoint) {
@@ -137,16 +146,8 @@ export default function Playground3D({ setGeneratedModels }) {
 
   const handlePointerMove = (e) => {
     if (buildMode !== 'WALL' || !startPoint) return;
-    
-    // Check if the floor plane was hit (usually the first intersection, or we filter)
-    const floorIntersect = e.intersections.find(i => i.object.name === "floorPlane");
-    if (floorIntersect) {
-      const { point } = floorIntersect;
-      setPreviewEnd([point.x, 0, point.z]);
-    } else {
-      const { point } = e;
-      setPreviewEnd([point.x, 0, point.z]);
-    }
+    const { point } = e;
+    setPreviewEnd([point.x, 0, point.z]);
   };
 
   const wallMeshes = useMemo(() => {
@@ -156,7 +157,7 @@ export default function Playground3D({ setGeneratedModels }) {
       }
       return null;
     });
-  }, [elements, buildMode, setElements]);
+  }, [elements, buildMode]);
 
   const fallbackMeshes = useMemo(() => {
     return elements.filter(el => el.type === 'wall' && (el.hasDoor || el.hasWindow)).flatMap((el) => {
@@ -231,12 +232,13 @@ export default function Playground3D({ setGeneratedModels }) {
             {mode === 'SELECT' ? '[ CURSOR ]' : `[ + ${mode} ]`}
           </button>
         ))}
+        
         <button
           onClick={handleSave}
-          disabled={isSaving}
-          className="mt-4 border border-black bg-black px-4 py-2 text-sm text-white transition-colors hover:bg-white hover:text-black disabled:opacity-50"
+          disabled={isSaving || elements.length === 0}
+          className="mt-4 border border-black bg-black px-4 py-2 text-sm text-white transition-all hover:bg-white hover:text-black disabled:opacity-50 uppercase tracking-widest"
         >
-          {isSaving ? '[ PERSISTING... ]' : '[ PERSIST MODEL ]'}
+          {saveStatus}
         </button>
 
         <label className="mt-2 border border-black bg-black px-4 py-2 text-sm text-white transition-colors hover:bg-gray-800 text-center cursor-pointer">
@@ -345,17 +347,8 @@ function Wall({ wall, buildMode, elements, setElements, isPreview }) {
 
   const angle = Math.atan2(end.x - start.x, end.z - start.z);
 
-  const wallMat = useMemo(() => (
-    <meshStandardMaterial 
-      color="white" 
-      transparent={isPreview} 
-      opacity={isPreview ? 0.3 : 1}
-    />
-  ), [isPreview]);
-
-  const snapMat = useMemo(() => (
-    <meshStandardMaterial color="white" transparent opacity={0.6} depthTest={false} />
-  ), []);
+  const wallMat = <meshStandardMaterial color="white" transparent={isPreview} opacity={isPreview ? 0.3 : 1} />;
+  const snapMat = <meshStandardMaterial color="white" transparent opacity={0.6} depthTest={false} />;
 
   const [hoverPoint, setHoverPoint] = useState(null);
 
@@ -376,7 +369,6 @@ function Wall({ wall, buildMode, elements, setElements, isPreview }) {
     if (isPreview) return;
     if ((buildMode === 'DOOR' || buildMode === 'WINDOW') && hoverPoint) {
       e.stopPropagation();
-      
       const isDoor = buildMode === 'DOOR';
       const width = isDoor ? 1.0 : 1.2;
       const elementHeight = isDoor ? 2.1 : 1.2;
@@ -389,10 +381,7 @@ function Wall({ wall, buildMode, elements, setElements, isPreview }) {
         position: [hoverPoint.x, yOffset, hoverPoint.z],
         rotation: angle
       };
-      
       setElements([...elements, newElement]);
-    } else if (buildMode === 'SELECT') {
-      // Basic select indication logic could go here
     }
   };
 
@@ -410,37 +399,23 @@ function Wall({ wall, buildMode, elements, setElements, isPreview }) {
         <Edges color="black" />
       </mesh>
 
-      {/* Snap preview for Door/Window */}
       {hoverPoint && (buildMode === 'DOOR' || buildMode === 'WINDOW') && (
         <mesh 
-          position={[
-            hoverPoint.x, 
-            buildMode === 'DOOR' ? 1.05 : 1.5, 
-            hoverPoint.z
-          ]} 
+          position={[hoverPoint.x, buildMode === 'DOOR' ? 1.05 : 1.5, hoverPoint.z]} 
           rotation={[0, angle, 0]}
           pointerEvents="none"
         >
-          <boxGeometry args={[
-            thickness + 0.1, 
-            buildMode === 'DOOR' ? 2.1 : 1.2, 
-            buildMode === 'DOOR' ? 1.0 : 1.2
-          ]} />
+          <boxGeometry args={[thickness + 0.1, buildMode === 'DOOR' ? 2.1 : 1.2, buildMode === 'DOOR' ? 1.0 : 1.2]} />
           {snapMat}
           <Edges color="black" />
         </mesh>
       )}
 
-      {/* Render attached Doors/Windows */}
       {!isPreview && elements && elements.map((el) => {
         if (el.parentId === wall.id) {
           return (
             <mesh key={el.id} position={el.position} rotation={[0, el.rotation, 0]}>
-              <boxGeometry args={[
-                thickness + 0.05, 
-                el.type === 'door' ? 2.1 : 1.2, 
-                el.type === 'door' ? 1.0 : 1.2
-              ]} />
+              <boxGeometry args={[thickness + 0.05, el.type === 'door' ? 2.1 : 1.2, el.type === 'door' ? 1.0 : 1.2]} />
               <meshStandardMaterial color="white" />
               <Edges color="black" />
             </mesh>
@@ -451,3 +426,4 @@ function Wall({ wall, buildMode, elements, setElements, isPreview }) {
     </group>
   );
 }
+

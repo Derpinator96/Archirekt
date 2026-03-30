@@ -3,7 +3,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { PointerLockControls, Sky, Environment, ContactShadows, Grid } from '@react-three/drei';
 import { useParams, Link } from 'react-router-dom';
 import * as THREE from 'three';
-import axios from 'axios';
+import { useModelContext } from '../../context/ModelContext';
 
 // FPS Controller Component
 const PlayerController = () => {
@@ -47,11 +47,17 @@ const PlayerController = () => {
   return null;
 };
 
-const WallMesh = ({ startX, startY, endX, endY, thickness, isLoadBearing }) => {
-  const length = Math.hypot(endX - startX, endY - startY);
-  const angle = Math.atan2(endY - startY, endX - startX);
-  const centerX = (startX + endX) / 2;
-  const centerZ = (startY + endY) / 2;
+const WallMesh = ({ startX, startY, endX, endY, start, end, thickness = 0.2, isLoadBearing }) => {
+  // Support both formats: backend (startX/Y) and manual (start/end array)
+  const sX = start ? start[0] : startX;
+  const sZ = start ? start[2] : startY;
+  const eX = end ? end[0] : endX;
+  const eZ = end ? end[2] : endY;
+
+  const length = Math.hypot(eX - sX, eZ - sZ);
+  const angle = Math.atan2(eZ - sZ, eX - sX);
+  const centerX = (sX + eX) / 2;
+  const centerZ = (sZ + eZ) / 2;
   const height = 3.0;
 
   return (
@@ -66,35 +72,25 @@ const WallMesh = ({ startX, startY, endX, endY, thickness, isLoadBearing }) => {
   );
 };
 
-const GameViewer = ({ models = [] }) => {
+const GameViewer = () => {
   const { id } = useParams();
+  const { savedModels, loading: contextLoading } = useModelContext();
   const [walls, setWalls] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-     if (models.length > 0) {
-         const found = models.find(m => m.id === id);
+     if (!contextLoading && savedModels.length > 0) {
+         const found = savedModels.find(m => m.id === id);
          if (found && found.walls) {
              setWalls(found.walls);
          } else {
              console.warn("Model ID not found in pipeline state.");
          }
          setLoading(false);
-     } else {
-         // Fallback if user hits directly without App context loaded yet
-         const fetchLatestModel = async () => {
-             try {
-                 const res = await axios.get('http://localhost:8000/api/models');
-                 const found = res.data.find(m => m.id === id);
-                 if (found) setWalls(found.walls);
-             } catch (err) {
-                 console.error('Failed to fetch fallback model:', err);
-             }
-             setLoading(false);
-         };
-         fetchLatestModel();
+     } else if (!contextLoading) {
+         setLoading(false);
      }
-  }, [id, models]);
+  }, [id, savedModels, contextLoading]);
 
   return (
     <div className="w-full h-screen bg-white relative font-body overflow-hidden">
@@ -151,12 +147,12 @@ const GameViewer = ({ models = [] }) => {
 
           {/* Render Wall Topology */}
           {walls.map((wall, i) => (
-            <WallMesh key={i} {...wall} />
+            <WallMesh key={wall.id || i} {...wall} />
           ))}
         </group>
       </Canvas>
 
-      {loading && (
+      {(loading || contextLoading) && (
         <div className="absolute inset-0 bg-white z-50 flex items-center justify-center">
           <p className="font-label text-[11px] uppercase tracking-[0.4em] animate-pulse">INIT_ARCHITECTURE_VR...</p>
         </div>

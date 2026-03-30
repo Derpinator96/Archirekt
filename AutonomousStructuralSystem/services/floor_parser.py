@@ -83,7 +83,7 @@ class ModelRecord(BaseModel):
 def get_models():
     conn = sqlite3.connect('asis_models.db')
     c = conn.cursor()
-    c.execute("SELECT id, date, thumbnail, walls_json FROM models ORDER BY date DESC LIMIT 10")
+    c.execute("SELECT id, date, thumbnail, walls_json FROM models ORDER BY date DESC LIMIT 20")
     rows = c.fetchall()
     conn.close()
     
@@ -96,6 +96,24 @@ def get_models():
             walls=json.loads(row[3])
         ))
     return models
+
+@app.post("/api/models")
+def save_manual_model(record: ModelRecord):
+    conn = sqlite3.connect('asis_models.db')
+    c = conn.cursor()
+    
+    # Check if model exists to handle updates
+    c.execute("SELECT id FROM models WHERE id = ?", (record.id,))
+    if c.fetchone():
+        c.execute("UPDATE models SET walls_json = ?, date = ?, thumbnail = ? WHERE id = ?",
+                  (json.dumps(record.walls), record.date, record.thumbnail, record.id))
+    else:
+        c.execute("INSERT INTO models (id, date, thumbnail, walls_json) VALUES (?, ?, ?, ?)",
+                  (record.id, record.date, record.thumbnail, json.dumps(record.walls)))
+    
+    conn.commit()
+    conn.close()
+    return {"status": "SUCCESS", "id": record.id}
 
 @app.post("/api/parse-floorplan", response_model=ParseResponse)
 async def parse_floorplan(file: UploadFile = File(...)):

@@ -1,7 +1,8 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 
-const ModelGallery = ({ models = [] }) => {
-  const loading = false;
+const ModelGallery = ({ models = [], loading = false }) => {
+  const navigate = useNavigate();
 
   return (
     <div className="w-full py-6 z-30">
@@ -52,13 +53,14 @@ const ModelGallery = ({ models = [] }) => {
                   alt="Dynamically Extracted CV Blueprint" 
                   src={model.thumbnail}
                 />
-                
-                 {/* Lock overlay removed */}
               </div>
               <div className="p-3 font-mono">
                 <div className="text-[8px] text-gray-500 leading-tight">ID: {model.id}</div>
                 <div className="text-[8px] text-gray-500 leading-tight mb-3">DATE: {model.date}</div>
-                <button className="w-full border border-black py-2 text-[9px] font-bold uppercase tracking-widest hover:bg-black hover:text-white transition-none shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px]">
+                <button 
+                  onClick={() => navigate(`/3d/${model.id}`)}
+                  className="w-full border border-black py-2 text-[9px] font-bold uppercase tracking-widest hover:bg-black hover:text-white transition-none shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px]"
+                >
                   [ VIEW 3D RENDER ]
                 </button>
               </div>

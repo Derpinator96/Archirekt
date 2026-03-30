@@ -1,7 +1,7 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../components/auth/AuthBridge';
-import Sidebar from '../components/layout/Sidebar';
+import { useModelContext } from '../context/ModelContext';
 import Topbar from '../components/layout/Topbar';
 import ModelGallery from '../components/dashboard/ModelGallery';
 import { motion } from 'framer-motion';
@@ -50,16 +50,22 @@ const NavigationCard = ({ icon, title, subtitle, status, isGuest, translateClass
   </div>
 );
 
-const MainDashboard = ({ models = [] }) => {
+const MainDashboard = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { isSignedIn } = useAuth();
+  const { savedModels, loading } = useModelContext();
   const isGuest = location.state?.guest && !isSignedIn;
 
   return (
-    <div className="bg-white text-black w-screen min-h-screen relative font-body overflow-x-hidden z-0">
+    <div 
+      className="bg-white text-black w-screen min-h-screen relative font-body overflow-x-hidden z-0"
+      style={{
+        backgroundImage: `url("data:image/svg+xml,%3Csvg width='50' height='50' viewBox='0 0 50 50' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M 50 0 L 0 0 0 50' fill='none' stroke='%23cccccc' stroke-width='1'/%3E%3C/svg%3E")`,
+        backgroundSize: '50px 50px'
+      }}
+    >
       <Topbar />
-      <Sidebar />
 
       {/* Main Canvas Context - First 100vh Screen */}
       <main className="relative z-10 w-full h-[100vh] pointer-events-none architectural-grid">
@@ -69,8 +75,8 @@ const MainDashboard = ({ models = [] }) => {
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.8, duration: 0.5 }}
-            className="w-48 text-right pointer-events-auto hidden xl:block"
-            style={{ position: 'absolute', top: '6rem', right: '3rem' }}
+            className="w-48 text-right pointer-events-auto hidden xl:block bg-white p-4 border-l border-b border-black"
+            style={{ position: 'absolute', top: '64px', right: '0' }}
         >
             <div className="border-b border-black pb-1 mb-2">
                 <span className="font-label text-[9px] uppercase tracking-[0.2em] font-bold">SYS_TELEM // 001</span>
@@ -164,8 +170,7 @@ const MainDashboard = ({ models = [] }) => {
       {/* Model Gallery Below Fold */}
       <section className="relative w-full z-20 bg-white border-t border-black pointer-events-auto">
           <div className="max-w-7xl mx-auto">
-              {/* Note: Merged both props here! */}
-              <ModelGallery locked={isGuest} models={models} />
+              <ModelGallery locked={isGuest} models={savedModels} loading={loading} />
           </div>
       </section>
     </div>
