@@ -1,8 +1,10 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useModelContext } from '../context/ModelContext';
 
-const GameSelection = ({ models = [] }) => {
+const GameSelection = () => {
   const navigate = useNavigate();
+  const { savedModels, loading } = useModelContext();
 
   return (
     <div className="bg-white text-black font-body selection:bg-black selection:text-white pb-24">
@@ -37,6 +39,7 @@ const GameSelection = ({ models = [] }) => {
       </header>
 
       {/* SideNavBar */}
+      {/* ... (keeping Sidebar same) */}
       <aside className="fixed left-0 top-16 h-[calc(100vh-64px)] w-20 flex flex-col z-40 bg-white border-r border-black">
         <div className="flex flex-col flex-1">
           <div className="bg-black text-white flex flex-col items-center justify-center py-6 border-b border-black cursor-pointer">
@@ -56,42 +59,40 @@ const GameSelection = ({ models = [] }) => {
             <span className="font-label uppercase text-[8px] tracking-[0.2em]">Histy</span>
           </div>
         </div>
-        <div className="flex flex-col border-t border-black">
-          <div className="flex flex-col items-center justify-center py-4 hover:bg-gray-100 transition-none cursor-pointer">
-            <span className="material-symbols-outlined">terminal</span>
-          </div>
-        </div>
       </aside>
 
       {/* Main Content Canvas */}
       <main className="ml-20 pt-16 min-h-screen relative architect-grid">
         <section className="max-w-7xl mx-auto px-12 py-24 relative z-10">
           
-          {/* Header Meta */}
           <div className="mb-16 flex justify-between items-end border-b border-black pb-4 bg-white/50 backdrop-blur">
             <div>
               <span className="font-label text-[10px] tracking-widest text-gray-500 uppercase block mb-2">Project Root / Models / Structural</span>
               <h2 className="font-headline text-5xl font-black tracking-tighter uppercase leading-none">Global_Inventory</h2>
             </div>
             <div className="text-right">
-              <span className="font-label text-[10px] tracking-widest text-black uppercase block">Active_Nodes: {models.length}</span>
-              <span className="font-label text-[10px] tracking-widest text-black uppercase block">Sync_Status: Verified</span>
+              <span className="font-label text-[10px] tracking-widest text-black uppercase block">Active_Nodes: {savedModels.length}</span>
+              <span className="font-label text-[10px] tracking-widest text-black uppercase block">Sync_Status: {loading ? 'FETCHING...' : 'VERIFIED'}</span>
             </div>
           </div>
 
-          {/* Selection Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12">
             
-            {models.length === 0 && (
+            {loading && (
+                <div className="col-span-full py-12 border border-black flex items-center justify-center bg-white shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
+                    <span className="font-mono text-xs uppercase tracking-[0.3em] font-bold animate-pulse">[ ACCESSING_REMOTE_DATABANKS... ]</span>
+                </div>
+            )}
+
+            {!loading && savedModels.length === 0 && (
                 <div className="col-span-full py-12 border border-black flex items-center justify-center bg-white shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
                     <span className="font-mono text-xs uppercase tracking-[0.3em] font-bold text-gray-500">[ NO_MODELS_IN_DATABASE ]</span>
                 </div>
             )}
 
-            {models.map((model, idx) => (
+            {!loading && savedModels.map((model, idx) => (
               <div key={model.id} className="group border border-black bg-white flex flex-col shadow-[4px_4px_0_0_rgba(0,0,0,1)] hover:-translate-y-2 hover:-translate-x-2 transition-transform duration-300 hover:shadow-[12px_12px_0_0_rgba(0,0,0,1)]">
                 <div className="aspect-[4/5] bg-gray-50 border-b border-black relative overflow-hidden p-8 flex items-center justify-center">
-                  {/* REAL BASE64 CV THUMBNAIL IMPLEMENTED HERE */}
                   <img 
                       className="w-full h-full object-contain mix-blend-multiply grayscale opacity-80 group-hover:scale-105 transition-transform duration-700" 
                       alt={`Parsed geometric graph topology ${model.id}`} 
@@ -124,33 +125,19 @@ const GameSelection = ({ models = [] }) => {
                 </div>
               </div>
             ))}
-
           </div>
 
-          {/* Bottom Context Info */}
           <div className="mt-24 grid grid-cols-1 md:grid-cols-3 gap-12 border-t border-black pt-8 bg-white/80 p-6 backdrop-blur shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
             <div>
               <span className="font-label text-[10px] tracking-[0.2em] font-bold uppercase block mb-4">System_Diagnostics</span>
               <p className="font-body text-xs leading-relaxed text-gray-600">
-                  The Autonomous Structural Intelligence System (ASIS) is currently preparing 5-Stage hackathon evaluations. All generative loops strictly obey real geometrical CV bounds.
+                  The Autonomous Structural Intelligence System (ASIS) repository is now unified. Projects saved in the 3D Playground are immediately visible here for kinetic analysis.
               </p>
-            </div>
-            <div>
-              <span className="font-label text-[10px] tracking-[0.2em] font-bold uppercase block mb-4">Pipeline_Constraints</span>
-              <p className="font-body text-xs leading-relaxed text-gray-600">
-                  Stages 04 (Materials) and 05 (Explainability) datasets are pending active LLM tradeoff injection inside the Render engine properties UI.
-              </p>
-            </div>
-            <div className="flex flex-col justify-end items-end">
-              <div className="font-label text-[10px] tracking-widest text-black uppercase">
-                  Terminal_Link: <span className="underline underline-offset-4 cursor-pointer">PRTCL_445.SH</span>
-              </div>
             </div>
           </div>
 
         </section>
       </main>
-
     </div>
   );
 };

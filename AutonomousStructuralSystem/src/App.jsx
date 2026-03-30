@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import axios from 'axios';
+import { ModelProvider } from './context/ModelContext';
 import { ClerkProviderWrapper } from './components/auth/ClerkProviderWrapper';
 import Login from './pages/Login';
 import SignUp from './pages/SignUp';
@@ -13,42 +13,32 @@ import Landing from './pages/landing';
 import './App.css';
 
 function App() {
-  const [generatedModels, setGeneratedModels] = useState([]);
-
-  useEffect(() => {
-    // Initial fetch from SQLite database to hydrate state
-    const hydrateModels = async () => {
-      try {
-        const res = await axios.get('http://localhost:8000/api/models');
-        if (res.data) setGeneratedModels(res.data);
-      } catch (err) {
-        console.error("Hydration failed (Backend offline?):", err);
-      }
-    };
-    hydrateModels();
-  }, []);
-
   return (
     <Router>
-      <ClerkProviderWrapper>
-        <Routes>
+      <ModelProvider>
+        <ClerkProviderWrapper>
+          <Routes>
           {/* Public / Auth Routes */}
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<SignUp />} />
 
-          {/* Main Dashboard & Generation Flow */}
-          <Route path="/dashboard" element={<MainDashboard models={generatedModels} />} />
-          <Route path="/playground" element={<Playground3D setGeneratedModels={setGeneratedModels} />} />
+            {/* Main Dashboard & Generation Flow */}
+            <Route path="/dashboard" element={<MainDashboard />} />
+            
+            {/* Playground 3D - Multi-route support */}
+            <Route path="/playground" element={<Playground3D />} />
+            <Route path="/3d/:modelId" element={<Playground3D />} />
 
-          {/* Note: I changed the path for Upload to avoid colliding with Playground3D */}
-          <Route path="/upload" element={<Upload />} /> 
+            {/* Note: I changed the path for Upload to avoid colliding with Playground3D */}
+            <Route path="/upload" element={<Upload />} /> 
 
-          {/* Immersive 3D Game Viewer Flow */}
-          <Route path="/dashboard/game-select" element={<GameSelection models={generatedModels} />} />
-          <Route path="/dashboard/game/:id" element={<GameViewer models={generatedModels} />} />
-      </Routes>
-      </ClerkProviderWrapper>
+            {/* Immersive 3D Game Viewer Flow */}
+            <Route path="/dashboard/game-select" element={<GameSelection />} />
+            <Route path="/dashboard/game/:id" element={<GameViewer />} />
+          </Routes>
+        </ClerkProviderWrapper>
+      </ModelProvider>
     </Router>
   );
 }
